@@ -12,7 +12,7 @@ static void LogLn(log_t *Log, const char *Format, va_list List, int32_t Level)
 
 static void MessageLog(render_output_t *Out, log_t *Log, vec2_t At, float DeltaTime)
 {
-	const float_t MessageLifeTime = 2.0f;
+	const float_t MessageLifeTime = 4.0f;
 	const float_t LineHeight = 25.0f;
 
 	int32_t _Max = Min(Log->LineCount - 1, Len(Log->Lines) - 1);
@@ -31,11 +31,11 @@ static void MessageLog(render_output_t *Out, log_t *Log, vec2_t At, float DeltaT
 
 			vec4_t BackColor = (Line->Level == 1) ? ColorRed : ColorPink * 0.75f; //RGB(10, 10, 10);
 			vec4_t Color = ColorWhite;
-			Color.w = 1.0f - Lerp;
-			BackColor.w *= Color.w;
+			Color = Color * (1.0f - Lerp);
+			BackColor = BackColor * Color.w;
 
-			float_t X = (At.x + (Lerp * 20.0f));;
-			RenderRect(Out, {X, LineAt.y}, V2(700.0f, 25.0f), BackColor);
+			float_t X = (At.x + (Lerp * 20.0f));
+			RenderRect(Out, {X, LineAt.y}, V2(800.0f, 25.0f), BackColor);
 			RenderString(Out, {X + 6, LineAt.y}, Line->Text, Color);
 			LineAt.y -= LineHeight;
 
@@ -61,10 +61,10 @@ static void BeginDebugFrame(client_t *Client, const input_t *Input)
 		SetupFromSize(&Debug.Cmds[0], &Debug.Memory, MB(4));
 		SetupFromSize(&Debug.Cmds[1], &Debug.Memory, MB(4));
 	}
-
-	Debug.DebugOutput = RenderTo(&Debug.Cmds[0], Debug.Assets);
+	
 	Debug.Device = GetGraphicsDevice(Client);
 	Debug.Assets = GetAssets(Client);
+	Debug.DebugOutput = RenderTo(&Debug.Cmds[0], Debug.Assets);
 
 	Debug.Foreground = RenderTo(&Debug.Cmds[1], Debug.Assets);
 
@@ -125,7 +125,7 @@ static void _DebugPoint(vec2_t Offset, vec4_t Color)
 
 static void DebugPrint(const char *Format, ...)
 {
-	char Message[64] = "";
+	char Message[256] = "";
 
 	va_list List = {};
 	va_start(List, Format);

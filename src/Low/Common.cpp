@@ -10,6 +10,16 @@ static float_t Cos(float_t Angle)
 	return Result;
 }
 
+static int32_t Clamp(int32_t Value, int32_t Min, int32_t Max)
+{
+	int32_t Result = Value;
+	if (Value < Min)
+		Result = Min;
+	if (Value > Max)
+		Result = Max;
+	return Result;
+}
+
 static float_t Clamp(float_t Value, float_t Min, float_t Max)
 {
 	float_t Result = Value;
@@ -29,6 +39,12 @@ static float_t Abs(float_t A)
 static float_t Min(float_t A, float_t B)
 {
 	float_t Result = A < B ? A : B;
+	return Result;
+}
+
+static float_t Max(float_t A, float_t B)
+{
+	float_t Result = A > B ? A : B;
 	return Result;
 }
 
@@ -76,7 +92,7 @@ static void SetupMemory(memory_t *Memory, uint8_t *Bytes, int32_t Length)
 	Memory->Bytes = Bytes;
 }
 
-static void MemoryClear(memory_t *Memory)
+static void Flush(memory_t *Memory)
 {
 	Memory->Offset = 0;
 }
@@ -84,11 +100,19 @@ static void MemoryClear(memory_t *Memory)
 static void *Push(memory_t *Memory, int32_t Count)
 {
 	uint8_t *Result = 0;
+
+	#if _DEBUG
+	Result = (uint8_t *)malloc(Count);
+	#else
 	if ((Memory->Offset + Count) <= Memory->Length)
 	{
 		Result = &Memory->Bytes[Memory->Offset];
 		Memory->Offset += Count;
 	}
+	#endif
+
+	memset(Result, 0, Count);
+
 	return Result;
 }
 
@@ -119,6 +143,12 @@ static void *Read(byte_stream_t *Stream, int32_t Count)
 static int32_t _EOF(byte_stream_t *Stream)
 {
 	int32_t Result = (Stream->Offset >= Stream->Length);
+	return Result;
+}
+
+static float_t Milliseconds(float_t Seconds)
+{
+	float_t Result = Seconds * 1000.0f;
 	return Result;
 }
 
@@ -160,6 +190,19 @@ static bool Compare(point_t A, point_t B)
 	return Result;
 }
 
+static int32_t ManhattanDistance(point_t A, point_t B)
+{
+	int32_t Result = abs(B.x - A.x) + abs(B.y - A.y);
+	return Result;
+}
+
+
+static float_t Distance(point_t A, point_t B)
+{
+	float_t Result = Length(V2(B) - V2(A));
+	return Result;
+}
+
 static point_t operator+(const point_t &A, const point_t &B)
 {
 	point_t Result = A;
@@ -167,6 +210,23 @@ static point_t operator+(const point_t &A, const point_t &B)
 	Result.y += B.y;
 	return Result;
 }
+
+static point_t operator-(const point_t &A, const point_t &B)
+{
+	point_t Result = A;
+	Result.x -= B.x;
+	Result.y -= B.y;
+	return Result;
+}
+
+static point_t Clamp(point_t Value, point_t Min, point_t Max)
+{
+	point_t Result = Value;
+	Result.x = Clamp(Result.x, Min.x, Max.x);
+	Result.y = Clamp(Result.y, Min.y, Max.y);
+	return Result;
+}
+//
 
 static vec2_t V2(float_t x, float_t y)
 {
@@ -294,6 +354,14 @@ static vec2_t Abs(vec2_t A)
 	return Result;
 }
 
+static vec2_t Floor(vec2_t A)
+{
+	vec2_t Result = A;
+	Result.x = floorf(A.x);
+	Result.y = floorf(A.y);
+	return Result;
+}
+
 static vec2_t Mix(vec2_t X, vec2_t Y, float_t A)
 {
 	vec2_t Result = {};
@@ -305,6 +373,12 @@ static vec2_t Mix(vec2_t X, vec2_t Y, float_t A)
 static vec4_t V4(float_t x)
 {
 	vec4_t Result = {x, x, x, x};
+	return Result;
+}
+
+static vec4_t V4(vec4_t A, float_t W)
+{
+	vec4_t Result = {A.x, A.y, A.z, W};
 	return Result;
 }
 
@@ -356,6 +430,14 @@ static rect_t Rect(vec2_t Offset, vec2_t Size)
 	return Result;
 }
 
+static rect_t Rect(struct bounds_t Bounds)
+{
+	rect_t Result = {};
+	Result.Offset = Bounds.Min;
+	Result.Size = Bounds.Max - Bounds.Min;
+	return Result;
+}
+
 static vec2_t RectCenter(rect_t Rect)
 {
 	vec2_t Result = Rect.Offset + Rect.Size * 0.5f;
@@ -376,6 +458,26 @@ static vec2_t RectMin(rect_t Rect)
 static vec2_t RectMax(rect_t Rect)
 {
 	vec2_t Result = Rect.Offset + Rect.Size;
+	return Result;
+}
+
+static rect_t Shrink(rect_t Rect, float_t Amount)
+{
+	rect_t Result = Rect;
+	Result.Offset.x += Amount;
+	Result.Offset.y += Amount;
+	Result.Size.x -= Amount * 2.0f;
+	Result.Size.y -= Amount * 2.0f;
+	return Result;
+}
+
+static rect_t Stretch(rect_t Rect, float_t Amount)
+{
+	rect_t Result = Rect;
+	Result.Offset.x -= Amount;
+	Result.Offset.y -= Amount;
+	Result.Size.x += Amount * 2.0f;
+	Result.Size.y += Amount * 2.0f;
 	return Result;
 }
 
@@ -403,6 +505,14 @@ static rect_t MaintainAspectRatio(rect_t Rect, float Aspect)
 	return Result;
 }
 
+static bool Contains(rect_t Rect, vec2_t Point)
+{
+	bounds_t Bound = Bounds(Rect);
+	bool Result = (Point.x >= Bound.Min.x) && (Point.y >= Bound.Min.y) &&
+		(Point.x <= Bound.Max.x) && (Point.y <= Bound.Max.y);
+	return Result;
+}
+
 static bounds_t Bounds(vec2_t Min, vec2_t Max)
 {
 	bounds_t Result = {};
@@ -410,6 +520,22 @@ static bounds_t Bounds(vec2_t Min, vec2_t Max)
 	Result.Max = Max;
 	return Result;
 }
+
+static bounds_t Bounds(rect_t Rect)
+{
+	bounds_t Result = Bounds(Rect.Offset, Rect.Offset + Rect.Size);
+	return Result;
+}
+
+static bounds_t Stretch(bounds_t Bb, float_t Amount)
+{
+	bounds_t Result = Bb;
+	Result.Min = Result.Min - V2(Amount);
+	Result.Max = Result.Max + V2(Amount);
+	return Result;
+}
+
+//
 
 static sphere_t Sphere(vec2_t Center, float_t Radius)
 {
@@ -468,7 +594,7 @@ static intersection_t IntersectRectangleToSphere(rect_t A, sphere_t B)
 
 // ...
 
-static surface_t SurfaceFromMemory(int32_t X, int32_t Y, uint32_t *Pixels)
+static surface_t CreateSurface(int32_t X, int32_t Y, uint32_t *Pixels)
 {
 	surface_t Result = {};
 	Result.Pixels = Pixels;
@@ -484,6 +610,14 @@ static void SetPixel(surface_t *Surface, int32_t X, int32_t Y, uint32_t Pixel)
 		*At = Pixel;
 }
 
+static uint32_t GetPixel(const surface_t *Surface, int32_t X, int32_t Y)
+{
+	uint32_t Result = 0;
+	if ((X >= 0) && (Y >= 0) && (X < Surface->X) && (Y < Surface->Y))
+		Result = Surface->Pixels[Surface->X * Y + X];
+	return Result;
+}
+
 static void Copy(const surface_t *From, surface_t *To, int32_t XOffset, int32_t YOffset)
 {
 	const uint32_t *At = From->Pixels;
@@ -496,6 +630,21 @@ static void Copy(const surface_t *From, surface_t *To, int32_t XOffset, int32_t 
 	}
 }
 
+static void CopyResize(const surface_t *From, surface_t *To)
+{
+	for (int32_t y = 0; y < To->Y; y++)
+	{
+		for (int32_t x = 0; x < To->X; x++)
+		{
+			float_t U = ((float_t)x / (float_t)To->X) * (float_t)From->X;
+			float_t V = ((float_t)y / (float_t)To->Y) * (float_t)From->Y;
+
+			uint32_t Pixel = GetPixel(From, (int32_t)U, (int32_t)V);
+			SetPixel(To, x, y, Pixel);
+		}
+	}
+}
+
 static void ClearColor(surface_t *Surface, int32_t Color)
 {
 	for (int32_t y = 0; y < Surface->Y; y++)
@@ -503,6 +652,27 @@ static void ClearColor(surface_t *Surface, int32_t Color)
 		for (int32_t x = 0; x < Surface->X; x++)
 		{
 			SetPixel(Surface, x, y, Color);
+		}
+	}
+}
+
+static void PremultiplyAlpha(surface_t *Surface)
+{
+	for (int32_t y = 0; y < Surface->Y; y++)
+	{
+		for (int32_t x = 0; x < Surface->X; x++)
+		{
+			uint32_t Pixel = GetPixel(Surface, x, y);
+			uint8_t R = Pixel & 0xff;
+			uint8_t G = (Pixel >> 8) & 0x00ff;
+			uint8_t B = (Pixel >> 16) & 0x0000ff;
+			uint8_t Alpha = (Pixel >> 24) & 0x000000ff;
+			float_t A = (float_t)Alpha / 255.0f;
+			R = (uint8_t)((float_t)R * A);
+			G = (uint8_t)((float_t)G * A);
+			B = (uint8_t)((float_t)B * A);
+			Pixel = (Alpha << 24) | (B << 16) | (G << 8) | R;
+			SetPixel(Surface, x, y, Pixel);
 		}
 	}
 }

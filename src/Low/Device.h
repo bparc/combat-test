@@ -1,7 +1,14 @@
 // Device.h
 
 typedef struct graphics_device_t graphics_device_t;
-static void Dispatch(graphics_device_t *Device, const struct command_buffer_t *Cmds, vec4_t View, struct transform_t Transform);
+
+enum
+{
+	Dispatch_Pixelated = 1 << 0,
+};
+
+static void Dispatch(graphics_device_t *Device, const struct command_buffer_t *Cmds, vec4_t View, struct transform_t Transform, int32_t Flags = 0);
+static void Dispatch(graphics_device_t *Device, const struct command_buffer_t *Cmds, int32_t First, int32_t Last, vec4_t View, struct transform_t Transform, int32_t Flags = 0);
 //static void ClearColor(graphics_device_t *Device, vec4_t Color);
 
 // Resources

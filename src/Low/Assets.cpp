@@ -6,7 +6,7 @@ static void SetupBitmapCache(bitmap_cache_t *Cache)
 	memset(Cache, 0, sizeof(*Cache));
 	int32_t X = Len(Cache->BitmapMemory[0]);
 	int32_t Y = Len(Cache->BitmapMemory);
-	Cache->Surface = SurfaceFromMemory(X, Y, &Cache->BitmapMemory[0][0]);
+	Cache->Surface = CreateSurface(X, Y, &Cache->BitmapMemory[0][0]);
 
 	Cache->PageSize = 32;
 	Cache->Padding = 4;
@@ -82,7 +82,9 @@ static void CopyToCache(bitmap_cache_t *Cache, int32_t X, int32_t Y, uint32_t *P
 		int32_t XDest = (BestPage.x * Cache->PageSize) + Cache->Padding;
 		int32_t YDest = (BestPage.y * Cache->PageSize) + Cache->Padding;
 
-		surface_t Source = SurfaceFromMemory(X, Y, Pixels);
+		surface_t Source = CreateSurface(X, Y, Pixels);
+		PremultiplyAlpha(&Source);
+
 		Copy(&Source, &Cache->Surface, XDest, YDest);
 		Cache->Dirty = true;
 	
@@ -98,8 +100,6 @@ static void UpdateCache(bitmap_cache_t *Cache, graphics_device_t *Device)
 		FreeTextureResource(Device, &Cache->Texture);
 		Cache->Texture = CreateTextureResource(Device, &Cache->Surface, 0);
 		Cache->Dirty = false;
-
-		DebugLog("");
 	}
 }
 
@@ -111,7 +111,7 @@ static void Setup(assets_t *Assets, graphics_device_t *Device)
 
 	SetupBitmapCache(&Assets->Cache);
 
-	uint32_t White[4][4] =
+	uint32_t White[16][16] =
 	{
 		0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff,
 		0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff,
@@ -135,7 +135,7 @@ static void MountDirectory(assets_t *Assets, const char *Directory)
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_STATIC
 #define STBI_ONLY_TGA
-#include "File Formats/stb/stb_image.h"
+#include "stb/stb_image.h"
 
 static bitmap_t LoadBitmapFromDirectory(assets_t *Assets, const char *Directory)
 {
@@ -150,6 +150,10 @@ static bitmap_t LoadBitmapFromDirectory(assets_t *Assets, const char *Directory)
 	{
 		Result = LoadBitmapFromMemory(Assets, X, Y, Pixels);
 		free(Pixels);
+	}
+	else
+	{
+		DebugLog("Couldn't load %s", FullDirectory);
 	}
 
 	return Result;
@@ -204,4 +208,9 @@ static asset_bitmap_t *GetBitmap(assets_t *Assets, bitmap_t Bitmap)
 		Result = &Assets->Bitmaps[Bitmap - 1];
 	}
 	return Result;
+}
+
+static uint32_t GetTextureCacheHandle(const assets_t *Assets)
+{
+	return (Assets->Cache.Texture.Handle);
 }

@@ -143,6 +143,7 @@ static int32_t SetVideoMode(client_t *Client, int32_t X, int32_t Y)
 	Client->VideoMode[0] = X;
 	Client->VideoMode[1] = Y;
 
+	InitializeGraphicsDevice(&Client->GraphicsDevice);
 	Setup(&Client->Assets, &Client->GraphicsDevice);
 
 	return true;
@@ -172,6 +173,12 @@ static double GetTime(void)
 	return result;
 }
 
+static double DebugGetTime(void)
+{
+	double Result = GetTime();
+	return Result;
+}
+
 static void AcquireInputs(HWND Window, input_t *Input, float_t DeltaTime)
 {
 	Input->DeltaTime = DeltaTime;
@@ -183,12 +190,24 @@ static void AcquireInputs(HWND Window, input_t *Input, float_t DeltaTime)
 		Input->Viewport.y = (float_t)(ClientRect.bottom - ClientRect.top);
 	}	
 
+	POINT CursorPos = {};
+	GetCursorPos(&CursorPos);
+	ScreenToClient(Window, &CursorPos);
+
+	Input->MouseCursor.x = (float)CursorPos.x;
+	Input->MouseCursor.y = (float)CursorPos.y;
+	UpdateButton(&Input->MouseButtons[0], GetAsyncKeyState(VK_LBUTTON) < 0, Input->DeltaTime);
+	UpdateButton(&Input->MouseButtons[1], GetAsyncKeyState(VK_RBUTTON) < 0, Input->DeltaTime);
+
 	for (int32_t Index = 0; Index < Len(Input->Controllers); Index++)
 	{
 		controller_t *Con = &Input->Controllers[0];
 
 		Con->Analogs[0] = {};
 		Con->Analogs[1] = {};
+
+		Con->Triggers[0] = {};
+		Con->Triggers[1] = {};
 
 		if (GetAsyncKeyState('W'))
 			Con->Analogs[0].y -= 1.0f;
@@ -198,6 +217,11 @@ static void AcquireInputs(HWND Window, input_t *Input, float_t DeltaTime)
 			Con->Analogs[0].x -= 1.0f;
 		if (GetAsyncKeyState('D'))
 			Con->Analogs[0].x += 1.0f;
+
+		if (GetAsyncKeyState('Q'))
+			Con->Triggers[0] = 1.0f;
+		if (GetAsyncKeyState('E'))
+			Con->Triggers[1] = 1.0f;
 
 		Con->DPad = {};
 
@@ -214,6 +238,9 @@ static void AcquireInputs(HWND Window, input_t *Input, float_t DeltaTime)
 			Con->DPad.x += 1;
 
 		UpdateButton(&Con->A, GetAsyncKeyState(VK_SPACE) < 0, Input->DeltaTime);
+
+		for (int32_t Y = 0; Y < Len(Con->DebugKeys); Y++)
+			UpdateButton(&Con->DebugKeys[Y], GetAsyncKeyState(VK_F1 + Y) < 0, Input->DeltaTime);
 
 		Con->Analogs[0] = Normalize(Con->Analogs[0]);
 		Con->Analogs[1] = Normalize(Con->Analogs[1]);
@@ -235,6 +262,7 @@ static int32_t Host(client_t *Client, input_t *Input)
 	Client->Time = GetTime();
 
 	float_t DeltaTime = (float_t)(Client->Time - Time);
+	DeltaTime = Clamp(DeltaTime, 0.0f, 1.0f);
 
 	AcquireInputs(Client->Window, &Client->Input, DeltaTime);
 
@@ -252,7 +280,10 @@ static void Present(client_t *Client)
 {
 	EndDebugFrame();
 	EndRender(&Client->GraphicsDevice);
+}
 
+static void Display(client_t *Client)
+{
 	SwapBuffers(Client->hDC);
 }
 
@@ -308,7 +339,7 @@ static void FreeFileContents(file_contents_t *Contents)
 	}
 }
 
-static void Error(const char *_format, ...)
+static void _Error(const char *_format, ...)
 {
 	va_list List = {0};
 	va_start(List, _format);
@@ -322,5 +353,5 @@ static void Error(const char *_format, ...)
 
 static void _Assert(const char *_message, const char *_file, const char *_function, int32_t _line)
 {
-	Error("Assertion failed! \n\nProgram: %s\nLine: %i\n\nFunction: %s\nExpression: %s", _file, _line, _function, _message);
+	_Error("Assertion failed! \n\nProgram: %s\nLine: %i\n\nFunction: %s\nExpression: %s", _file, _line, _function, _message);
 }

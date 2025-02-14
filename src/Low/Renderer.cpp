@@ -1,11 +1,41 @@
 
+//
+
 static transform_t Transform(vec2_t Offset, vec2_t Size)
 {
 	transform_t Result = {};
-	Result.GlobalOffset = Offset;
+	Result.Center = Offset;
 	Result.Size = Size;
 	return Result;
 }
+
+static vec2_t MinCorner(transform_t Transform)
+{
+	vec2_t Result = Transform.Center - (Transform.Size * 0.5f);
+	return Result;
+}
+
+static vec2_t MaxCorner(transform_t Transform)
+{
+	vec2_t Result = Transform.Center + (Transform.Size * 0.5f);
+	return Result;
+}
+
+static bounds_t GetCameraBounds(transform_t Transform)
+{
+	bounds_t Result = {};
+	Result.Min = MinCorner(Transform);
+	Result.Max = MaxCorner(Transform);
+	return Result;
+}
+
+static vec2_t MapTo(transform_t Transform, vec2_t Point)
+{
+	vec2_t Result = (Transform.Center - (Transform.Size * 0.5f)) - Point;
+	return Result;
+}
+
+// ...
 
 static void Setup(command_buffer_t *Cmds, vertex_t *Vertices, int32_t VertexCount, render_command_t *Commands, int32_t CommandCount)
 {
@@ -70,13 +100,9 @@ static vertex_t *ReserveVertices(command_buffer_t *Cmds, int32_t Count, primitiv
 
 	Command = TryMerge(Cmds, Count, Prim, Texture);
 	
-	if (!Command && (Cmds->CmdCount < Cmds->MaxCmdCount)) // Couldn't merge...
+	if (!Command) // Couldn't merge...
 	{
-		Command = &Cmds->Commands[Cmds->CmdCount++];
-		memset(Command, 0, sizeof(*Command));
-		Command->Primitive = (uint8_t)Prim;
-		Command->Texture = Texture;
-		Command->Offset = Cmds->VertexCount;
+		Command = AppendCommand(Cmds, Prim, Texture);
 	}
 	
 	if (Command && (Cmds->VertexCount + Count) < Cmds->MaxVertexCount) // Reserve...
@@ -87,6 +113,20 @@ static vertex_t *ReserveVertices(command_buffer_t *Cmds, int32_t Count, primitiv
 	}
 
 	return Result;
+}
+
+static render_command_t *AppendCommand(command_buffer_t *Cmds, primitive_t Prim, uint32_t Texture)
+{
+	render_command_t *Command = 0;
+	if (Cmds->CmdCount < Cmds->MaxCmdCount)
+	{
+		Command = &Cmds->Commands[Cmds->CmdCount++];
+		memset(Command, 0, sizeof(*Command));
+		Command->Primitive = (uint8_t)Prim;
+		Command->Texture = Texture;
+		Command->Offset = Cmds->VertexCount;
+	}
+	return Command;
 }
 
 static void AppendQuad(command_buffer_t *Cmds, vec2_t A, vec2_t B, vec2_t C, vec2_t D, vec4_t Color, uint32_t Texture, vec2_t TexCoordMin, vec2_t TexCoordMax)
@@ -120,15 +160,17 @@ static void AppendQuad(command_buffer_t *Cmds, vec2_t Offset, vec2_t Size, vec4_
 	AppendQuad(Cmds, {Min.x, Min.y}, {Max.x, Min.y}, {Max.x, Max.y}, {Min.x, Max.y}, Color, Texture, TexCoordMin, TexCoordMax);
 }
 
-static void AppendLine(command_buffer_t *Cmds, vec2_t A, vec2_t B, vec4_t Color)
+static void AppendLine(command_buffer_t *Cmds, vec2_t A, vec2_t B, vec4_t Color, uint32_t Texture, vec2_t TexCoordMin, vec2_t TexCoordMax)
 {
-	vertex_t *Vertices = ReserveVertices(Cmds, 2, Primitive_Line, 0);
+	vertex_t *Vertices = ReserveVertices(Cmds, 2, Primitive_Line, Texture);
 	if (Vertices)
 	{
 		Vertices[0].Offset = A;
 		Vertices[1].Offset = B;
 		Vertices[0].Color = Color;
 		Vertices[1].Color = Color;
+		Vertices[0].TexCoord = TexCoordMin;
+		Vertices[1].TexCoord = TexCoordMax;
 	}
 }
 
@@ -165,7 +207,7 @@ static void RenderRect(render_output_t *Out, vec2_t Offset, vec2_t Size, vec4_t 
 	asset_bitmap_t *Asset = GetBitmap(Out->Assets, Out->Assets->None);
 	if (Asset)
 	{
-		RenderTexturedQuad(Out, Offset, Size, Color, Out->Assets->Cache.Texture, Asset->Min + V2(1), Asset->Max);
+		RenderTexturedQuad(Out, Offset, Size, Color, Out->Assets->Cache.Texture, Asset->Min + V2(2, 2), Asset->Max - V2(2, 2));
 	}
 }
 
@@ -250,7 +292,9 @@ static void _RenderString(render_output_t *Out, vec2_t Offset, bitmap_t Bitmap, 
 	const char *At = Text;
 	Offset.x = floorf(Offset.x);
 	Offset.y = floorf(Offset.y);
-
+	
+	Color = Color * Color.w;
+	
 	while (*At)
 	{
 		uint8_t Codepoint = *At++;
@@ -281,14 +325,14 @@ static void RenderString(render_output_t *Out, vec2_t Offset, const char *Text, 
 		Offset.x = floorf(Offset.x);
 		Offset.y = floorf(Offset.y);
 
-		_RenderString(Out, Offset - V2(1, 1), Font->Bitmap, &Font->Info, ColorBlack, Text);
+		_RenderString(Out, Offset - V2(1, 1), Font->Bitmap, &Font->Info, V4(ColorBlack, Color.w), Text);
 		_RenderString(Out, Offset, Font->Bitmap, &Font->Info, Color, Text);
 	}
 }
 
 static void RenderLine(render_output_t *Out, vec2_t From, vec2_t To, vec4_t Color)
 {
-	AppendLine(Out->Out, From, To, Color);
+	AppendLine(Out->Out, From, To, Color);	
 }
 
 static void RenderPoint(render_output_t *Out, vec2_t Offset, vec4_t Color)

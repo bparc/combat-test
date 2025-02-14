@@ -2,11 +2,15 @@
 
 struct transform_t
 {
-	vec2_t GlobalOffset;
+	vec2_t Center; // Center
 	vec2_t Size;
 };
 
 static transform_t Transform(vec2_t Offset, vec2_t Size);
+static vec2_t MinCorner(transform_t Transform);
+static vec2_t MaxCorner(transform_t Transform);
+static bounds_t GetCameraBounds(transform_t Transform);
+static vec2_t MapTo(transform_t Transform, vec2_t Point);
 
 //
 
@@ -52,8 +56,8 @@ static void Clear(command_buffer_t *Cmds);
 static vertex_t *ReserveVertices(command_buffer_t *Cmds, int32_t Count, primitive_t Prim, uint32_t Texture = 0);
 static void AppendQuad(command_buffer_t *Cmds, vec2_t A, vec2_t B, vec2_t C, vec2_t D, vec4_t Color, uint32_t Texture = 0, vec2_t TexCoordMin = {}, vec2_t TexCoordMax = {});
 static void AppendQuad(command_buffer_t *Cmds, vec2_t Offset, vec2_t Size, vec4_t Color, uint32_t Texture = 0, vec2_t TexCoordMin = {}, vec2_t TexCoordMax = {});
-static void AppendLine(command_buffer_t *Cmds, vec2_t A, vec2_t B, vec4_t Color);
-
+static void AppendLine(command_buffer_t *Cmds, vec2_t A, vec2_t B, vec4_t Color, uint32_t Texture = 0, vec2_t TexCoordMin = {}, vec2_t TexCoordMax = {});
+static render_command_t *AppendCommand(command_buffer_t *Cmds, primitive_t Prim, uint32_t Texture = 0);
 //
 
 struct render_output_t

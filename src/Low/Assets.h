@@ -1,6 +1,6 @@
 // Assets.h
-#include "File Formats/BMFont.h"
-#include "File Formats/BMFont.cpp"
+#include "BMFont.h"
+#include "BMFont.cpp"
 
 // Handles
 typedef uint16_t bitmap_t;
@@ -72,3 +72,4 @@ static font_t LoadFontFromDirectory(assets_t *Assets, const char *Directory); //
 static void SetDefaultFont(assets_t *Assets, font_t Font);
 
 static asset_bitmap_t *GetBitmap(assets_t *Assets, bitmap_t Bitmap);
+static uint32_t GetTextureCacheHandle(const assets_t *Assets);

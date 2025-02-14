@@ -10,6 +10,8 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 #define M_TAU (M_PI * 2)
+#include "MurmurHash3.h"
+#include "MurmurHash3.cpp"
 
 #define Len(Array) (sizeof(Array) / sizeof(*Array))
 
@@ -22,12 +24,18 @@
 static void _Assert(const char *message, const char *file, const char *function, int32_t line);
 #define Assert(expression) (void) ((!!(expression)) || (_Assert(#expression, __FILE__, __FUNCTION__, __LINE__), 0))
 
+static void _Error(const char *_format, ...);
+#define Error(Message, ...) _Error(Message, __VA_ARGS__)
+
 static void _DebugLog(const char *Format, ...);
 #ifdef _DEBUG
 #define DebugLog(Format, ...) _DebugLog("%04i %-10s %s(): " ## Format ## "\n", __LINE__, SkipToLastOccurence(__FILE__,'\\'), __func__, __VA_ARGS__)
 #else
 #define DebugLog(...)
 #endif
+
+static float_t Milliseconds(float_t Seconds);
+static double DebugGetTime(void);
 
 //
 
@@ -38,11 +46,15 @@ static float_t Sin(float_t Angle); // Range: 0.0 - 1.0
 static float_t Cos(float_t Angle);
 
 static float_t Min(float_t A, float_t B);
+static float_t Max(float_t A, float_t B);
 static int32_t Min(int32_t A, int32_t B);
 static int32_t Max(int32_t A, int32_t B);
 
 static float_t Sign(float_t Value);
+
+static int32_t Clamp(int32_t Value, int32_t Min, int32_t Max);
 static float_t Clamp(float_t Value, float_t Min, float_t Max);
+
 static float_t Mix(float_t X, float_t Y, float_t A);
 static float_t Step(float_t Edge0, float_t Edge1, float_t t);
 
@@ -56,8 +68,11 @@ struct memory_t
 };
 
 static void SetupMemory(memory_t *Memory, uint8_t *Bytes, int32_t Length);
-static void MemoryClear(memory_t *Memory);
+static void Flush(memory_t *Memory);
 static void *Push(memory_t *Memory, int32_t Count);
+#define PushType(Memory, Type) (Type *)Push(Memory, sizeof(Type))
+#define PushArray(Memory, Type, Count) (Type *)Push(Memory, sizeof(Type) * Count)
+
 
 struct file_contents_t
 {
@@ -92,8 +107,13 @@ struct point_t
 static point_t Point(int32_t X, int32_t Y);
 static point_t Point(struct vec2_t A);
 static bool Compare(point_t A, point_t B);
+static int32_t ManhattanDistance(point_t A, point_t B);
+static float_t Distance(point_t A, point_t B);
 
 static point_t operator+(const point_t &A, const point_t &B);
+static point_t operator-(const point_t &A, const point_t &B);
+
+static point_t Clamp(point_t Value, point_t Min, point_t Max);
 
 struct vec2_t
 {
@@ -123,6 +143,7 @@ static vec2_t Normalize(vec2_t A);
 static vec2_t Mix(vec2_t X, vec2_t Y, float_t A);
 static vec2_t Clamp(vec2_t Value, vec2_t Min, vec2_t Max);
 static vec2_t Abs(vec2_t A);
+static vec2_t Floor(vec2_t A);
 
 struct 
 vec4_t
@@ -134,6 +155,7 @@ vec4_t
 };
 
 static vec4_t V4(float_t x); // x, x, x, x
+static vec4_t V4(vec4_t A, float_t W);
 static vec4_t V4(vec2_t A, vec2_t B);
 static vec4_t Mix(vec4_t X, vec4_t Y, float_t A);
 static vec4_t RGBA(uint8_t R, uint8_t G, uint8_t B, uint8_t A = 255);
@@ -184,12 +206,17 @@ union rect_t
 };
 
 static rect_t Rect(vec2_t Offset, vec2_t Size);
+static rect_t Rect(struct bounds_t Bounds);
 static vec2_t RectCenter(rect_t Rect);
 static vec2_t RectExtends(rect_t Rect);
 static vec2_t RectMin(rect_t Rect);
 static vec2_t RectMax(rect_t Rect);
+static rect_t Shrink(rect_t Rect, float_t Amount);
+static rect_t Stretch(rect_t Rect, float_t Amount);
 static vec4_t V4(rect_t Rect);
 static rect_t MaintainAspectRatio(rect_t Rect, float Aspect);
+
+static bool Contains(rect_t Rect, vec2_t Point);
 
 struct bounds_t
 {
@@ -198,7 +225,9 @@ struct bounds_t
 };
 
 static bounds_t Bounds(vec2_t Min, vec2_t Max);
-
+static bounds_t Bounds(rect_t Rect);
+static bounds_t Stretch(bounds_t Bb, float Amount);
+	
 struct sphere_t
 {
 	vec2_t Center;
@@ -228,10 +257,15 @@ struct surface_t
 	int32_t Y;
 };
 
-static surface_t SurfaceFromMemory(int32_t X, int32_t Y, uint32_t *Pixels);
+static surface_t CreateSurface(int32_t X, int32_t Y, uint32_t *Pixels);
 static void SetPixel(surface_t *Surface, int32_t X, int32_t Y, uint32_t Pixel);
+static uint32_t GetPixel(const surface_t *Surface, int32_t X, int32_t Y);
+
 static void Copy(const surface_t *From, surface_t *To, int32_t XOffset, int32_t YOffset);
+static void CopyResize(const surface_t *From, surface_t *To);
+
 static void ClearColor(surface_t *Surface, int32_t Color);
+static void PremultiplyAlpha(surface_t *Surface);
 
 template<typename _Type, int32_t MaxCount>
 struct array_t

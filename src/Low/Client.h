@@ -25,23 +25,33 @@ struct button_t
 struct controller_t
 {
 	bool Connected;
-	vec2_t Analogs[2]; // NOTE: Dead-zones already applied
+	vec2_t Analogs[2]; // NOTE: Dead-zones already applied!
+	float_t Triggers[2];
 	point_t DPad;
 	
-	button_t A, B, Y, X; // XBOX
+	button_t A, B, Y, X; // XBOX controller buttons
+
+	button_t DebugKeys[12]; // Mapped to F1 - F12
 };
 
 struct input_t
 {
 	vec2_t Viewport;
+	vec2_t MouseCursor;
+	button_t MouseButtons[2];
+
 	controller_t Controllers[1];
 	float_t DeltaTime;
 };
+
+// AcquireInputs() (Platform/Platform_*.cpp)
 
 // ...
 
 static int32_t Host(client_t *Client, /*Out*/ input_t *Input);
 static void Present(client_t *Client);
+
+static void Display(client_t *Client); // SwapBuffers()
 
 #include "Renderer.h"
 #include "Renderer.cpp"
